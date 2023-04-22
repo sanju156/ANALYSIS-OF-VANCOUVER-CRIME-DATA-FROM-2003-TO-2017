@@ -1,0 +1,329 @@
+---
+title: "AOSD Final Assignment"
+author: "Sanju Shree Suresh Kumar"
+date: "2023-03-08"
+output:
+  html_document:
+    df_print: paged
+---
+
+<center> <font size="5"> __ANALYSIS OF VANCOUVER CRIME DATA FROM 2003 TO 2017__ </font></center>
+              
+<center> __Institute for Geoinformatics, Heisenbergstrasse 2, 48149 Munster, Germany__ </center>  
+
+
+## Introduction
+
+The goal of this analysis is to explore vehicle theft patterns in Vancouver in 2017. And to explore the overall theft from 2003 - 2017 based on seasons. To understand these analysis with statistics calculation used some  combination of heatmaps, bar plots, and maps to visualize and understand these patterns.The project used R programming language and various packages such as ggplot2, leaflet, and ggiraphExtra. The data set used in the analysis was obtained from the city of Vancouver's open data portal.
+
+
+```{r}
+library(readr)
+library(leaflet)
+library(ggiraphExtra)
+library(leaflet.extras)
+library(ggplot2)
+library(MASS)
+library(htmltools)
+```
+
+The project's libraries were loaded in the section above. For particular processes, each library was loaded.
+
+
+## Data Used
+
+In this project, I have used 1 csv file for the analysis.
+
+## Dataset Description 
+
+The data named as crime and it consist of Crime details of Vancouver from the year 2003 to 2017 it has fields of Types of Thefts, Date, Month, Year, Neighbourhood, Latitude, Longitude, Hour and Minutes of thefts.
+
+```{r}
+df <- read_csv("C:/Users/sanju/Downloads/AOSD Final Assignment/data/crime.csv", col_types = cols(TYPE = col_character(),
+                                                                                          HUNDRED_BLOCK = col_character(),
+                                                                                          NEIGHBOURHOOD = col_character(),
+                                                                                          YEAR = col_double(),
+                                                                                          MONTH = col_double(),
+                                                                                          DAY = col_double(),
+                                                                                          HOUR = col_double(),
+                                                                                          MINUTE = col_double(),
+                                                                                          X = col_double(),
+                                                                                          Y = col_double(),
+                                                                                          Latitude = col_double(),
+                                                                                          Longitude =col_double()))
+```
+
+The CSV file "crime.csv" was read into R and stored in a data frame named "df". The file contains 12 columns, with the "TYPE", "HUNDRED_BLOCK", and "NEIGHBOURHOOD" columns being character types, while the remaining columns are numeric (double) types. 
+
+```{r}
+# Create a dataset of vehicle thefts in 2017
+veh2017 <-  df[(df$YEAR == 2017) & (df$TYPE == "Theft of Vehicle"),]
+```
+
+The original data frame df that contains only the records of vehicle thefts in the year 2017. The subset is stored in a new data frame called veh2017.
+
+```{r}
+# Create a list of lat and long values
+heat_data <- lapply(1:nrow(veh2017), function(i) {
+  c(veh2017$Latitude[i], veh2017$Longitude[i])
+})
+
+# Convert heat_data to a data frame
+heat_df <- data.frame(do.call(rbind, heat_data))
+names(heat_df) <- c("lat", "lng")
+```
+Created a list of latitude and longitude values from the veh2017 data frame. It uses the lapply() function to loop through each row of the data frame, and for each row, it creates a two-element vector containing the latitude and longitude values for that row. For mapping the heat data in the map
+
+
+## Heatmap
+
+```{r}
+# Create a map centered on Vancouver
+map_van <- leaflet() %>%
+  setView(lng = -123.11, lat = 49.24, zoom = 12)
+
+# Add OpenStreetMap tiles
+map_van <- addTiles(map_van)
+
+# Add the heatmap layer to the map
+map_van <- addHeatmap(map_van, data = heat_df)
+
+# Display the map
+map_van
+```
+
+Created a new Leaflet map and assigns it to the variable map_van. The addHeatmap() function is used to add a heatmap layer to the map, using the heat_df data frame as the data source. This function creates a heatmap layer that displays the density of crime events in the year 2017.
+
+## Hypothesis 1 
+
+Null Hypothesis : The proportion of car theft occurrences during the morning and proportion of car theft occurrences during the evening are equal.
+
+
+## Method Used 
+
+```{r}
+# Create a dataset of counts per hour 
+veh_hour <- aggregate(df$TYPE, by = list(df$HOUR), FUN = length)
+names(veh_hour) <- c("HOUR", "COUNT")
+
+# Plot the count of vehicle thefts by hour
+
+ggplot(data = veh_hour, aes(x = HOUR, y = COUNT)) + 
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "When are Vehicle Thefts Happening", x = "Hour of the Day", y = "Thefts/Hour") +
+  theme(plot.title = element_text(hjust=0.5))
+
+```
+
+
+Created a dataset of counts per hour and plots the count of vehicle thefts by hour using the ggplot2 package in R
+
+Then created subsets for morning and evening thefts.Calculated the number of thefts in each subset and the total number of thefts in the entire dataset. To calculate the proportion of thefts for each time of day.Using the two-proportion z-test,  compared the proportions of thefts that occurred in the morning versus the evening
+
+```{r}
+# Create subsets of morning and evening thefts
+morning_thefts <- subset(veh2017, HOUR < 12)
+evening_thefts <- subset(veh2017, HOUR >= 12)
+
+# Calculate the number of thefts in each subset
+morning_count <- nrow(morning_thefts)
+evening_count <- nrow(evening_thefts)
+
+# Calculate the total number of thefts
+total_count <- nrow(veh2017)
+
+# Calculate the proportion of morning and evening thefts
+
+morning_prop <- morning_count / total_count
+evening_prop <- evening_count / total_count
+
+# Perform the two-proportion z-test
+prop.test(x = c(morning_count, evening_count), n = c(total_count, total_count), alternative="two.sided")
+```
+
+The result from the two-sample test for equality of proportions with continuity correction shows a large chi-squared statistic of 207.68 with 1 degree of freedom and a very small p-value of less than 2.2e-16. This indicates that the observed difference between the proportions of morning and evening vehicle thefts is unlikely to have occurred by chance and suggests strong evidence for rejecting the null hypothesis that the proportions are equal.
+
+The 95% confidence interval for the difference in proportions is -0.4203246 to -0.3240463, which does not contain 0. This also supports the rejection of the null hypothesis and suggests that the proportion of vehicle thefts is significantly different between the morning and evening hours.
+
+The sample estimates show that the proportion of vehicle thefts in the morning is 0.3139073 and in the evening is 0.6860927. This indicates that there are more vehicle thefts in the evening hours than in the morning hours.
+
+## Alternative Hypothesis
+
+The proportion of car theft occurrences during the evening is greater then the proportion of car theft occurrences during the morning.
+
+
+## Two-proportion z-test
+
+The two-proportion z-test is a hypothesis test that compares the proportion of an event in two independent groups.The test statistic for the two-proportion z-test is calculated by subtracting the two proportions and dividing by the standard error of the difference. The standard error is calculated by taking the square root of the sum of the variances of the two proportions.
+
+
+## Visualization
+
+The above result visualized in the bar plot showing the proportion of car thefts during the morning and evening.
+
+
+```{r}
+# Create a data frame with the proportions
+prop_df <- data.frame(Time_of_day = c("Morning", "Evening"),
+                      Proportion = c(morning_prop, evening_prop))
+
+# Create the bar plot
+
+ggplot(prop_df, aes(x = Time_of_day, y = Proportion)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Proportion of car thefts during morning and evening",
+       x = "Time of day",
+       y = "Proportion")+
+theme_bw()
+```
+
+## To Identify Top 10 Neighbourhood Vechicle Theft and Number of Occurence
+
+To identify the top 10 neighborhoods with the highest frequency of vehicle thefts at 6pm from the (When are Vehicle Thefts Happening) graph , created a map using Leaflet then added markers for each theft location with the name of the neighborhood and frequency of theft. 
+
+```{r}
+# Create a map centered on Vancouver
+map_van2 <- leaflet() %>%
+  setView(lng = -123.11, lat = 49.24, zoom = 12)
+
+# Add OpenStreetMap tiles
+map_van2 <- addTiles(map_van2)
+
+# Create a dataset for 2017 vehicle thefts at 6pm (the worst time for thefts)
+veh2017_16 <- veh2017[veh2017$HOUR == 18 & veh2017$TYPE == "Theft of Vehicle",]
+
+# Count the number of thefts for each neighborhood
+loc_freq <- table(veh2017_16$NEIGHBOURHOOD)
+
+# Sort the table by frequency in descending order
+loc_freq <- sort(loc_freq, decreasing = TRUE)
+
+# Subset the top 10 neighborhoods
+N <- 10
+top_neighborhoods <- names(head(loc_freq, N))
+# Add markers for each theft location with the name of the neighborhood and frequency of theft
+map_van2 <- addMarkers(map_van2, 
+                        data = veh2017_16[veh2017_16$NEIGHBOURHOOD %in% top_neighborhoods,], 
+                        lat = ~Latitude, 
+                        lng = ~Longitude, 
+                        popup = paste("<b>Neighborhood:</b> ", veh2017_16$NEIGHBOURHOOD, "<br>",
+                                      "<b>Frequency of Theft:</b> ", as.vector(table(veh2017_16$NEIGHBOURHOOD))[match(veh2017_16$NEIGHBOURHOOD, names(table(veh2017_16$NEIGHBOURHOOD)))]))
+#Display the map
+map_van2
+```
+
+
+
+And subsetted the top 10 neighborhoods with the highest frequency of thefts and displayed the locations on the map.
+
+
+  1) Hastings-Sunrise          - 8
+
+  2) Mount Pleasant            - 8
+
+  3) Grandview-Woodland        - 6
+
+  4) Renfrew-Collingwood       - 6
+
+  5) Central Business District - 5
+
+  6) Kensington-Cedar Cottage  - 5
+
+  7) Kitsilano                 - 5
+
+  8) Riley Park                - 5
+
+  9) Marpole                   - 4
+
+10) Sunset                    - 4
+
+
+## Hypothesis 2 
+
+
+Null Hypothesis : The number of theft occurrences in the non-summer season is less than the number of theft occurrences in the summer season from 2003 to 2017.
+
+
+## Method Used 
+
+A dataset of crime occurrences and comparing the proportion of crimes that occurred during summer months (June, July, August, and September) because in Vancouver the summer starts from June and ends in September,to the proportion of crimes that occurred during non-summer months (all other months from October to May).
+
+A new column called "summer" is created using the ifelse function in the crime_data. This column is set to 1 for rows where the "MONTH" column is one of the summer months, and 0 otherwise.
+
+The proportion of crimes during summer and non-summer months is calculated by dividing these totals by the total number of rows in the dataset.A two-sample proportion test is performed using the prop.test function to determine whether the proportion of crimes during non-summer months is significantly greater than the proportion of crimes during summer months.
+
+
+```{r}
+# Load the dataset
+crime_data <- read.csv("C:/Users/sanju/Downloads/AOSD Final Assignment/data/crime.csv")
+
+# Create a new column for summer months
+crime_data$summer <- ifelse(crime_data$MONTH %in% c(6, 7, 8, 9), 1, 0)
+
+# Calculate the total number of crimes during summer months and non-summer months
+summer_crimes <- sum(crime_data$summer)
+non_summer_crimes <- sum(1 - crime_data$summer)
+
+# Calculate the proportion of crimes during summer months and non-summer months
+prop_summer_crimes <- summer_crimes / nrow(crime_data)
+prop_non_summer_crimes <- non_summer_crimes / nrow(crime_data)
+
+# Perform a two-sample proportion test to compare the proportion of crimes during summer and non-summer months
+prop.test(c(summer_crimes, non_summer_crimes), c(nrow(crime_data), nrow(crime_data)), alternative ="less") 
+
+```
+
+
+## Output
+The output of the 2-sample test for equality of proportions with continuity correction indicates that the test statistic is X-squared = 104457, which corresponds to a p-value less than 2.2e-16.The 95% confidence interval for the difference in proportions is -1.0000000 to -0.3122093. The sample estimates for prop 1 (proportion of crimes during summer) and prop 2 (proportion of crimes during non-summer) are 0.3431364 and 0.6568636, respectively. Therefore, we can reject the null hypothesis that the number of theft occurrences in the non-summer season is less than the number of theft occurrences in the summer season from 2003 to 2017 at a significance level of 0.05.
+
+
+## Alternative Hypothesis
+The number of theft occurrences in the non-summer season is greater than the number of theft occurrences in the summer season from 2003 to 2017.
+
+
+## Visulaization
+
+The above result is visualized in the bar plot using ggplot2.
+
+
+```{r}
+# Create a bar plot of crime counts by month
+ggplot(crime_data, aes(x = MONTH, fill = factor(summer))) +
+  geom_bar() +
+  scale_fill_discrete(name = "Summer",
+                      labels = c("Non-Summer", "Summer")) +
+  labs(x = "Month", y = "Crime Count",
+       title = "Crime Count by Month (Summer vs. Non-Summer)") +
+  theme_minimal()
+```
+
+
+## Results
+
+The heatmap revealed that the downtown core and surrounding areas had the highest density of thefts, with a decrease in density towards the outskirts of the city. The proportion of evening thefts was found to be significantly greater than the proportion of morning thefts by p value less than 2.2e-16 using two proportion z test. The bar plot showed that approximately 68% of thefts occurred in the evening, while 31% occurred in the morning. The map of the top 10 neighborhoods with the highest frequency of thefts at 6pm showed that Downtown and Strathcona had the highest frequency of thefts.
+
+The proportion of crimes during summer months is 0.342, while the proportion of crimes during non-summer months is 0.658. The two-sample proportion test results in a p-value less than 2.2e-16, indicating that the proportion of crimes during non-summer months is significantly greater than the proportion of crimes during summer months.
+
+The bar plot shows that the number of crimes generally increases from January to August, with a slight dip in July. The number of crimes then decreases from August to December. The fill colors show that the majority of crimes occur during non-summer months, with the exception of August and September, which have a higher number of crimes than the preceding months.
+
+
+## Conclusion
+
+The analysis of vehicle theft data in Vancouver in 2017 using R programming language and various packages revealed important insights into the spatial and temporal patterns of thefts. The findings may be useful for law enforcement agencies and policy makers in developing strategies to reduce vehicle thefts in the city.It suggests that people should be more cautious about leaving their vehicles parked in the evening, especially in high-risk neighborhoods such as Downtown, Central Business District, and Fairview. This information could be useful for the Vancouver Police Department to allocate resources and prevent vehicle thefts.The bar plot provides a visual representation of the distribution of crime throughout the year, showing that the number of crimes generally increases during the first half of the year and then decreases during the second half.
+
+
+
+## Reference
+
+1) RDocumentation: Two Sample Z-test for Proportions:       https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/prop.test
+
+2) NIST/SEMATECH e-Handbook of Statistical Methods: Two-Sample z-test for Proportions: https://www.itl.nist.gov/div898/handbook/eda/section3/eda353.htm
+
+3) Leaflet documentation on Heatmap Layers: https://leafletjs.com/reference-1.7.1.html#heatmap-layer
+
+4) Chi-squared test: https://statisticsbyjim.com/hypothesis-testing/chi-square-test-independence/
+
+5) p value : https://en.wikipedia.org/wiki/P-value
+
+
